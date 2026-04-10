@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>崁頂公館通勤系統</title>
+    
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/Bobkao0527/bobtaipeiMRT/20296ecd31b8fa2372a545c4e5f991954d6b29ac/icon.jpeg">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-green: #4ade80;
+            --neon-red: #ff4444;
+            --dark-bg: #020617;
+        }
+
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: var(--dark-bg);
+            color: #e2e8f0;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .cyber-font {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .journey-card {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 1.25rem;
+            border: 1px solid rgba(0, 242, 255, 0.15);
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .journey-card.out-of-service {
+            border: 1px solid rgba(255, 68, 68, 0.4);
+        }
+
+        .journey-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), var(--neon-green), transparent);
+            animation: scan 4s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .step-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 1.25rem 0.75rem;
+            position: relative;
+            background: linear-gradient(90deg, rgba(0, 242, 255, 0.03) 0%, rgba(74, 222, 128, 0.03) 100%);
+        }
+
+        .step-row:not(:last-child) {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .time-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 62px;
+        }
+
+        .time-dep {
+            @apply cyber-font text-xl font-bold tracking-tight;
+            color: var(--neon-blue);
+            text-shadow: 0 0 12px rgba(0, 242, 255, 0.6);
+        }
+
+        .time-arr {
+            @apply cyber-font text-xl font-bold tracking-tight;
+            color: var(--neon-green);
+            text-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+        }
+
+        .route-visual {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .station-name {
+            @apply text-[14px] font-bold text-white whitespace-nowrap flex flex-col items-center;
+        }
+
+        .connector-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--neon-blue) 0%, var(--neon-green) 100%);
+            position: relative;
+            min-width: 25px;
+            opacity: 0.6;
+        }
+
+        .btn-next-bus {
+            @apply w-full py-4 px-4 bg-slate-900/60 text-cyan-400 font-bold text-xs tracking-[0.2em] transition-all active:bg-cyan-950/50 flex items-center justify-center gap-2 border-t border-white/5;
+        }
+
+        .label-text {
+            @apply text-[8px] font-bold uppercase tracking-widest mb-0.5;
+        }
+
+        .btn-lock {
+            @apply flex items-center justify-center gap-2 px-3 py-2 rounded-full border-2 transition-all duration-300 text-[11px] font-black tracking-[0.05em] shadow-lg active:scale-95;
+            min-width: 130px;
+        }
+        .btn-lock.unlocked {
+            @apply border-emerald-500/50 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10;
+        }
+        .btn-lock.locked {
+            @apply border-red-500 text-red-500 bg-red-500/10 animate-pulse;
+        }
+
+        .error-text {
+            @apply text-red-500 font-bold text-sm cyber-font tracking-tighter;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-10">
+
+    <div class="max-w-md mx-auto px-4 py-6">
+        <header class="mb-6 flex justify-between items-center border-b border-slate-800 pb-5">
+            <div class="flex-1">
+                <div class="flex items-center gap-2">
+                    <h1 id="title-text" class="text-lg cyber-font font-bold tracking-[0.2em] text-white">崁頂公館通勤系統</h1>
+                </div>
+                <div class="text-[10px] font-bold text-slate-500 mt-1 tracking-widest uppercase">
+                    Commute Intelligence System
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-end gap-3">
+                <div class="text-right">
+                    <p id="current-time-display" class="cyber-font text-2xl font-bold text-cyan-400">--:--</p>
+                </div>
+                
+                <button id="lock-toggle" class="btn-lock unlocked">
+                    <span id="lock-icon">●</span>
+                    <span id="lock-text-btn">按此鎖定時刻表</span>
+                </button>
+            </div>
+        </header>
+
+        <div id="main-container" class="space-y-6">
+            <div class="flex flex-col items-center justify-center py-20 gap-4">
+                <div class="w-10 h-10 border border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                <p class="cyber-font text-[10px] text-cyan-900 tracking-[0.5em]">系統初始化中</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTW2l0HWECp7aHxDU3gO4KCzqYnTfwuujaHqYnciuMgyF3LbEJQQVq-aGPKBYLEtNnt46n4y48Adjl5/pub?output=csv';
+        const CACHE_KEY = 'bus_timetable_data_universal';
+        const LOCK_KEY = 'bus_locked_data_universal';
+
+        let journeyOffsets = { 'SOUTH_LONG': 0, 'NORTH_LONG': 0 };
+        let isLocked = false;
+
+        function updateClock() {
+            const now = new Date();
+            const hh = now.getHours().toString().padStart(2, '0');
+            const mm = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('current-time-display').innerText = `${hh}:${mm}`;
+        }
+
+        function addMinutes(hhmm, mins) {
+            let h = parseInt(hhmm.substring(0, 2)), m = parseInt(hhmm.substring(2, 4)) + mins;
+            h += Math.floor(m / 60); m = m % 60;
+            return h.toString().padStart(2, '0') + m.toString().padStart(2, '0');
+        }
+
+        function formatTime(hhmm) { 
+            let h = parseInt(hhmm.substring(0, 2)) % 24;
+            let m = hhmm.substring(2, 4);
+            return h.toString().padStart(2, '0') + ':' + m;
+        }
+
+        function toggleNextBus(journeyId) {
+            if (isLocked) return;
+            journeyOffsets[journeyId] = (journeyOffsets[journeyId] + 1) % 3;
+            updateUI();
+        }
+
+        function applyLockVisuals(locked) {
+            const btn = document.getElementById('lock-toggle');
+            const icon = document.getElementById('lock-icon');
+            const text = document.getElementById('lock-text-btn');
+            const title = document.getElementById('title-text');
+
+            if (locked) {
+                btn.className = "btn-lock locked";
+                icon.innerText = "■";
+                text.innerText = "時間已鎖定";
+                title.innerText = "時間已錨定";
+                title.classList.add('text-red-500');
+            } else {
+                btn.className = "btn-lock unlocked";
+                icon.innerText = "●";
+                text.innerText = "按此鎖定時刻表";
+                title.innerText = "崁頂公館通勤系統";
+                title.classList.remove('text-red-500');
+            }
+        }
+
+        document.getElementById('lock-toggle').onclick = () => {
+            isLocked = !isLocked;
+            applyLockVisuals(isLocked);
+            if (isLocked) {
+                const currentContent = document.getElementById('main-container').innerHTML;
+                localStorage.setItem(LOCK_KEY, JSON.stringify({
+                    html: currentContent,
+                    offsets: journeyOffsets
+                }));
+            } else {
+                localStorage.removeItem(LOCK_KEY);
+                updateUI();
+            }
+        };
+
+        async function init() {
+            updateClock();
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            if (cachedData) window.csvData = cachedData;
+
+            const lockStore = localStorage.getItem(LOCK_KEY);
+            if (lockStore) {
+                const state = JSON.parse(lockStore);
+                isLocked = true;
+                journeyOffsets = state.offsets;
+                applyLockVisuals(true);
+                document.getElementById('main-container').innerHTML = state.html;
+            } else {
+                updateUI();
+            }
+
+            try {
+                const res = await fetch(CSV_URL);
+                const text = await res.text();
+                window.csvData = text;
+                localStorage.setItem(CACHE_KEY, text);
+                if (!isLocked) updateUI();
+            } catch (e) {
+                console.error("資料更新失敗");
+            }
+
+            setInterval(updateClock, 10000);
+            setInterval(() => { if (!isLocked) updateUI(); }, 30000);
+        }
+
+        function renderStep(from, to, depTime, arrTime) {
+            return `
+                <div class="step-row">
+                    <div class="time-box">
+                        <span class="label-text text-cyan-900">發車</span>
+                        <span class="time-dep">${formatTime(depTime)}</span>
+                    </div>
+                    <div class="route-visual">
+                        <span class="station-name">${from}</span>
+                        <div class="connector-line"></div>
+                        <span class="station-name">${to}</span>
+                    </div>
+                    <div class="time-box">
+                        <span class="label-text text-green-900">抵達</span>
+                        <span class="time-arr">${formatTime(arrTime)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getBestTime(rows, col, filterTime, offset = 0) {
+            let data = [];
+            for (let r = 1; r < rows.length; r++) {
+                const t = rows[r][col];
+                if (t && /^\d{4}$/.test(t)) {
+                    if (t >= filterTime) data.push(t);
+                }
+            }
+            data.sort();
+            return data[offset] || null;
+        }
+
+        function updateUI() {
+            if (isLocked || !window.csvData) return;
+            
+            const rows = window.csvData.split('\n').map(r => r.split(',').map(c => c.trim()));
+            const container = document.getElementById('main-container');
+            const now = new Date();
+            let currentH = now.getHours();
+            let currentM = now.getMinutes().toString().padStart(2, '0');
+            let currentHHMM = (currentH < 4 ? (currentH + 24) : currentH).toString().padStart(2, '0') + currentM;
+            
+            container.innerHTML = '';
+
+            // --- 往南：崁頂(6) -> 紅樹林(7) -> 中正(1) -> 公館 ---
+            const southOffset = journeyOffsets['SOUTH_LONG'];
+            let sHtml = "";
+            let sPossible = true;
+            let sTime = currentHHMM;
+
+            let s1 = getBestTime(rows, 6, sTime, southOffset);
+            if (!s1) sPossible = false;
+            else {
+                let s1Arr = addMinutes(s1, 25);
+                sHtml += renderStep("崁頂", "紅樹林", s1, s1Arr);
+                let s2 = getBestTime(rows, 7, s1Arr, 0);
+                if (!s2) sPossible = false;
+                else {
+                    let s2Arr = addMinutes(s2, 39);
+                    sHtml += renderStep("紅樹林", "中正紀念堂", s2, s2Arr);
+                    let s3 = getBestTime(rows, 1, s2Arr, 0);
+                    if (!s3) sPossible = false;
+                    else {
+                        sHtml += renderStep("中正紀念堂", "公館", s3, addMinutes(s3, 6));
+                    }
+                }
+            }
+            renderCard("往南：崁頂 ➔ 紅樹林 ➔ 中正 ➔ 公館", sHtml, sPossible, southOffset, 'SOUTH_LONG');
+
+            // --- 往北：公館(2) -> 中正(3,4) 邏輯優化 ---
+            const northOffset = journeyOffsets['NORTH_LONG'];
+            let nHtml = "";
+            let nPossible = true;
+            let nTime = currentHHMM;
+
+            // 1. 公館到中正紀念堂 (Col 2)
+            let n1 = getBestTime(rows, 2, nTime, northOffset);
+            if (!n1) nPossible = false;
+            else {
+                let n1Arr = addMinutes(n1, 6);
+                nHtml += renderStep("公館", "中正紀念堂", n1, n1Arr);
+                
+                // 邏輯核心：比較 Col 3 (往淡水) 與 Col 4 (往北投)
+                let c3Time = getBestTime(rows, 3, n1Arr, 0); // 往淡水直達車
+                let c4Time = getBestTime(rows, 4, n1Arr, 0); // 往北投區間車
+
+                // 判斷哪一台先來
+                if (c3Time && (!c4Time || c3Time <= c4Time)) {
+                    // 往淡水先到 -> 一車直達
+                    let toRedArr = addMinutes(c3Time, 39);
+                    nHtml += renderStep("中正紀念堂", "紅樹林", c3Time, toRedArr);
+                    
+                    // 紅樹林到崁頂 (Col 8)
+                    let n3 = getBestTime(rows, 8, toRedArr, 0);
+                    if (!n3) nPossible = false;
+                    else nHtml += renderStep("紅樹林", "崁頂", n3, addMinutes(n3, 25));
+                } 
+                else if (c4Time) {
+                    // 往北投先到 -> 需在奇岩轉乘
+                    let toQiyanArr = addMinutes(c4Time, 25);
+                    nHtml += renderStep("中正紀念堂", "奇岩", c4Time, toQiyanArr);
+                    
+                    // 在奇岩站接續 往淡水班次 (Col 5)
+                    let qiyanDep = getBestTime(rows, 5, toQiyanArr, 0);
+                    if (!qiyanDep) nPossible = false;
+                    else {
+                        let toRedArr = addMinutes(qiyanDep, 14);
+                        nHtml += renderStep("奇岩", "紅樹林", qiyanDep, toRedArr);
+                        
+                        // 紅樹林到崁頂 (Col 8)
+                        let n3 = getBestTime(rows, 8, toRedArr, 0);
+                        if (!n3) nPossible = false;
+                        else nHtml += renderStep("紅樹林", "崁頂", n3, addMinutes(n3, 25));
+                    }
+                } else {
+                    nPossible = false;
+                }
+            }
+            renderCard("往北：公館 ➔ 中正 ➔ 紅樹林 ➔ 崁頂", nHtml, nPossible, northOffset, 'NORTH_LONG');
+
+            function renderCard(name, html, possible, offset, id) {
+                const card = document.createElement('div');
+                card.className = "journey-card flex flex-col" + (possible ? "" : " out-of-service");
+                if (!possible) {
+                    card.innerHTML = `<div class="px-4 py-3 bg-red-950/20"><div class="text-xs font-bold text-red-200">${name}</div></div><div class="py-10 text-center error-text">目前無可用班次</div>`;
+                } else {
+                    card.innerHTML = `<div class="px-4 py-3 bg-slate-900/40 border-b border-white/5"><div class="text-xs font-bold text-slate-100 tracking-wide">${name}</div></div>` + html;
+                    const btn = document.createElement('button');
+                    btn.className = "btn-next-bus cyber-font";
+                    btn.innerHTML = `<span>掃描後續班次 (+${offset})</span>`;
+                    btn.onclick = () => toggleNextBus(id);
+                    card.appendChild(btn);
+                }
+                container.appendChild(card);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
