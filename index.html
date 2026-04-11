@@ -134,9 +134,54 @@
         .error-text {
             @apply text-red-500 font-bold text-sm cyber-font tracking-tighter;
         }
+
+        /* 時刻表彈窗樣式 */
+        #data-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(2, 6, 23, 0.95);
+            z-index: 1000;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .table-container {
+            width: 100%;
+            height: 85%;
+            overflow: auto;
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.5);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th {
+            background: rgba(0, 242, 255, 0.1);
+            color: var(--neon-blue);
+            padding: 12px 8px;
+            text-align: center;
+            border-bottom: 2px solid var(--neon-blue);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: #cbd5e1;
+            font-family: 'Orbitron', sans-serif;
+        }
+        tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
     </style>
 </head>
-<body class="min-h-screen pb-10">
+<body class="min-h-screen pb-20">
 
     <div class="max-w-md mx-auto px-4 py-6">
         <header class="mb-6 flex justify-between items-center border-b border-slate-800 pb-5">
@@ -166,6 +211,26 @@
                 <div class="w-10 h-10 border border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
                 <p class="cyber-font text-[10px] text-cyan-900 tracking-[0.5em]">系統初始化中</p>
             </div>
+        </div>
+
+        <!-- 查看全部時刻表按鈕 -->
+        <div class="mt-10 mb-10">
+            <button onclick="openModal()" class="w-full py-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-cyan-400 cyber-font text-xs tracking-widest font-bold active:bg-cyan-500/20 transition-all">
+                VIEW FULL TIMETABLE / 查看全部時刻表
+            </button>
+        </div>
+    </div>
+
+    <!-- 數據彈窗 -->
+    <div id="data-modal">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-white cyber-font font-bold tracking-widest">RAW DATA (COL 0-8)</h2>
+            <button onclick="closeModal()" class="text-red-400 cyber-font font-bold p-2 border border-red-400/30 rounded">CLOSE [X]</button>
+        </div>
+        <div class="table-container" id="table-wrap">
+            <table id="raw-table">
+                <!-- JavaScript 動態插入 -->
+            </table>
         </div>
     </div>
 
@@ -300,6 +365,47 @@
             return data[offset] || null;
         }
 
+        function openModal() {
+            if (!window.csvData) return;
+            const rows = window.csvData.split('\n').map(r => r.split(',').map(c => c.trim()));
+            const table = document.getElementById('raw-table');
+            table.innerHTML = '';
+
+            // 建立表頭 (Row 0) -> 格式「站點 > 方向」
+            const headerRow = document.createElement('tr');
+            const headers = rows[0];
+            for (let i = 0; i <= 8; i++) {
+                const th = document.createElement('th');
+                const title = headers[i] || `Col ${i}`;
+                // 處理標題格式：中正紀念堂 往淡水 -> 中正紀念堂 > 往淡水
+                th.innerText = title.replace(/\s+/g, ' > ');
+                headerRow.appendChild(th);
+            }
+            table.appendChild(headerRow);
+
+            // 填充數據列
+            for (let r = 1; r < rows.length; r++) {
+                const tr = document.createElement('tr');
+                let hasData = false;
+                for (let i = 0; i <= 8; i++) {
+                    const td = document.createElement('td');
+                    const val = rows[r][i] || '';
+                    td.innerText = val;
+                    tr.appendChild(td);
+                    if (val) hasData = true;
+                }
+                if (hasData) table.appendChild(tr);
+            }
+
+            document.getElementById('data-modal').style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 禁止底層滾動
+        }
+
+        function closeModal() {
+            document.getElementById('data-modal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
         function updateUI() {
             if (isLocked || !window.csvData) return;
             
@@ -337,54 +443,41 @@
             }
             renderCard("往南：崁頂 ➔ 紅樹林 ➔ 中正 ➔ 公館", sHtml, sPossible, southOffset, 'SOUTH_LONG');
 
-            // --- 往北：公館(2) -> 中正(3,4) 邏輯優化 ---
+            // --- 往北：公館(2) -> 中正(3,4) 邏輯 ---
             const northOffset = journeyOffsets['NORTH_LONG'];
             let nHtml = "";
             let nPossible = true;
             let nTime = currentHHMM;
 
-            // 1. 公館到中正紀念堂 (Col 2)
             let n1 = getBestTime(rows, 2, nTime, northOffset);
             if (!n1) nPossible = false;
             else {
                 let n1Arr = addMinutes(n1, 6);
                 nHtml += renderStep("公館", "中正紀念堂", n1, n1Arr);
                 
-                // 邏輯核心：比較 Col 3 (往淡水) 與 Col 4 (往北投)
-                let c3Time = getBestTime(rows, 3, n1Arr, 0); // 往淡水直達車
-                let c4Time = getBestTime(rows, 4, n1Arr, 0); // 往北投區間車
+                let c3Time = getBestTime(rows, 3, n1Arr, 0); // 往淡水直達
+                let c4Time = getBestTime(rows, 4, n1Arr, 0); // 往北投區間
 
-                // 判斷哪一台先來
                 if (c3Time && (!c4Time || c3Time <= c4Time)) {
-                    // 往淡水先到 -> 一車直達
                     let toRedArr = addMinutes(c3Time, 39);
                     nHtml += renderStep("中正紀念堂", "紅樹林", c3Time, toRedArr);
-                    
-                    // 紅樹林到崁頂 (Col 8)
                     let n3 = getBestTime(rows, 8, toRedArr, 0);
                     if (!n3) nPossible = false;
                     else nHtml += renderStep("紅樹林", "崁頂", n3, addMinutes(n3, 25));
                 } 
                 else if (c4Time) {
-                    // 往北投先到 -> 需在奇岩轉乘
                     let toQiyanArr = addMinutes(c4Time, 25);
                     nHtml += renderStep("中正紀念堂", "奇岩", c4Time, toQiyanArr);
-                    
-                    // 在奇岩站接續 往淡水班次 (Col 5)
                     let qiyanDep = getBestTime(rows, 5, toQiyanArr, 0);
                     if (!qiyanDep) nPossible = false;
                     else {
                         let toRedArr = addMinutes(qiyanDep, 14);
                         nHtml += renderStep("奇岩", "紅樹林", qiyanDep, toRedArr);
-                        
-                        // 紅樹林到崁頂 (Col 8)
                         let n3 = getBestTime(rows, 8, toRedArr, 0);
                         if (!n3) nPossible = false;
                         else nHtml += renderStep("紅樹林", "崁頂", n3, addMinutes(n3, 25));
                     }
-                } else {
-                    nPossible = false;
-                }
+                } else { nPossible = false; }
             }
             renderCard("往北：公館 ➔ 中正 ➔ 紅樹林 ➔ 崁頂", nHtml, nPossible, northOffset, 'NORTH_LONG');
 
