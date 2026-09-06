@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>崁頂公館高科技轉乘系統</title>
+    
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/Bobkao0527/bobtaipeiMRT/20296ecd31b8fa2372a545c4e5f991954d6b29ac/icon.jpeg">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-green: #4ade80;
+            --neon-red: #ff4444;
+            --dark-bg: #020617;
+        }
+
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: var(--dark-bg);
+            color: #e2e8f0;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .cyber-font {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .journey-card {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 1.25rem;
+            border: 1px solid rgba(0, 242, 255, 0.15);
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        /* 沒車時的紅色風格 */
+        .journey-card.out-of-service {
+            border: 1px solid rgba(255, 68, 68, 0.4);
+            box-shadow: 0 0 25px rgba(255, 68, 68, 0.1);
+        }
+
+        .journey-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), var(--neon-green), transparent);
+            animation: scan 4s linear infinite;
+        }
+
+        .journey-card.out-of-service::before {
+            background: linear-gradient(90deg, transparent, var(--neon-red), transparent);
+        }
+
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .step-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 1.25rem 0.75rem;
+            position: relative;
+            background: linear-gradient(90deg, rgba(0, 242, 255, 0.03) 0%, rgba(74, 222, 128, 0.03) 100%);
+        }
+
+        .out-of-service .step-row {
+            background: linear-gradient(90deg, rgba(255, 68, 68, 0.05) 0%, transparent 100%);
+        }
+
+        .step-row:not(:last-child) {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .time-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 62px;
+        }
+
+        .time-dep {
+            @apply cyber-font text-xl font-bold tracking-tight;
+            color: var(--neon-blue);
+            text-shadow: 0 0 12px rgba(0, 242, 255, 0.6);
+        }
+
+        .time-arr {
+            @apply cyber-font text-xl font-bold tracking-tight;
+            color: var(--neon-green);
+            text-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+        }
+
+        .route-visual {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .station-name {
+            @apply text-[13px] font-bold text-white whitespace-nowrap;
+        }
+
+        .connector-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--neon-blue) 0%, var(--neon-green) 100%);
+            position: relative;
+            min-width: 25px;
+            opacity: 0.6;
+        }
+
+        .out-of-service .connector-line {
+            background: var(--neon-red);
+            opacity: 0.3;
+        }
+
+        .label-text {
+            @apply text-[8px] font-bold uppercase tracking-widest mb-0.5;
+        }
+
+        .btn-lock {
+            @apply flex items-center justify-center gap-2 px-3 py-1.5 rounded-full border border-slate-700/80 transition-all duration-300 text-[11px] font-black tracking-[0.05em] shadow-lg active:scale-95 shrink-0;
+        }
+        .btn-lock.unlocked {
+            @apply border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+        }
+        .btn-lock.locked {
+            @apply border-red-500/80 text-red-400 bg-red-500/20 animate-pulse;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .error-text {
+            @apply text-red-500 font-bold text-sm cyber-font tracking-tighter;
+            text-shadow: 0 0 8px rgba(255, 68, 68, 0.4);
+        }
+
+        /* 隱藏原生捲軸 */
+        .scrollbar-none::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-none {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-10">
+
+    <div class="max-w-md mx-auto px-4 py-4">
+        <!-- 頂端狀態列：移除定位資訊，保留鎖定按鈕 -->
+        <header class="mb-4 flex justify-between items-center border-b border-slate-800/80 pb-3 pt-1">
+            <div class="text-[11px] font-bold text-cyan-400 flex items-center gap-2 tracking-wider bg-slate-900/80 px-3 py-1.5 rounded-full border border-cyan-500/20 shadow-inner">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f2ff]"></span>
+                <span>系統已連線</span>
+            </div>
+            
+            <button id="lock-toggle" class="btn-lock unlocked">
+                <span id="lock-icon">●</span>
+                <span id="lock-text-btn">按此鎖定時刻表</span>
+            </button>
+        </header>
+
+        <!-- 時間軸控制器區塊 -->
+        <section class="journey-card mb-5 p-4 bg-slate-900/90">
+            <div class="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f2ff]"></span>
+                    <span class="text-[10px] font-bold text-cyan-400 tracking-[0.2em] uppercase">基準發車時刻</span>
+                </div>
+                
+                <div class="flex items-center gap-2.5">
+                    <button id="btn-sync-now" class="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider bg-cyan-950/70 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-500/20 active:scale-95 transition-all flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>即時</span>
+                    </button>
+
+                    <div class="flex items-baseline gap-1">
+                        <span id="display-selected-time" class="cyber-font text-2xl font-black text-cyan-300 drop-shadow-[0_0_10px_rgba(0,242,255,0.6)]">--:--</span>
+                        <span id="display-sub-time" class="text-[9px] font-mono text-slate-400 hidden"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 橫向滑動軸容器 -->
+            <div class="relative w-full rounded-xl bg-slate-950/80 border border-cyan-500/25 py-2 overflow-hidden shadow-inner">
+                <!-- 中央瞄準紅外線指針 -->
+                <div class="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-[2px] bg-cyan-400 z-20 pointer-events-none shadow-[0_0_8px_#00f2ff]">
+                    <div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[4px] border-x-transparent border-t-[6px] border-t-cyan-400"></div>
+                    <div class="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[4px] border-x-transparent border-b-[6px] border-b-cyan-400"></div>
+                </div>
+
+                <!-- 捲動刻度軸 -->
+                <div id="timeline-scroller" class="overflow-x-auto flex select-none cursor-grab active:cursor-grabbing scrollbar-none touch-pan-x" style="-webkit-overflow-scrolling: touch;">
+                    <div id="timeline-pad-left" class="shrink-0"></div>
+                    <div id="timeline-track" class="flex items-end shrink-0 h-14 pb-1">
+                        <!-- 刻度由 JS 動態生成 -->
+                    </div>
+                    <div id="timeline-pad-right" class="shrink-0"></div>
+                </div>
+            </div>
+
+            <div class="mt-2 flex justify-between text-[9px] text-slate-500 font-mono px-1">
+                <span>05:40 首班</span>
+                <span class="text-slate-400/80">◀ 左右捲動調整時間 ▶</span>
+                <span>25:10 末班</span>
+            </div>
+        </section>
+
+        <!-- 轉乘班次卡片區塊 -->
+        <div id="main-container" class="space-y-6">
+            <div class="flex flex-col items-center justify-center py-20 gap-4">
+                <div class="w-10 h-10 border border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                <p class="cyber-font text-[10px] text-cyan-900 tracking-[0.5em]">系統初始化中</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTW2l0HWECp7aHxDU3gO4KCzqYnTfwuujaHqYnciuMgyF3LbEJQQVq-aGPKBYLEtNnt46n4y48Adjl5/pub?output=csv';
+        const CACHE_KEY = 'bus_timetable_data_universal';
+        const LOCK_TIME_KEY = 'bus_locked_time_val';
+
+        const START_MINUTES = 340;  // 05:40
+        const END_MINUTES = 1510;   // 25:10 (翌日 01:10)
+        const STEP_MIN = 5;         // 刻度每 5 分鐘
+        const PX_PER_MIN = 2.4;     // 每分鐘像素比例
+
+        // 旅程固定順序：上方往南、下方往北
+        const JOURNEYS = [
+            {
+                id: 'SOUTH',
+                name: "往南：崁頂 ➔ 紅樹林 ➔ 中正紀念堂 ➔ 公館",
+                type: 'fixed',
+                startFrom: '崁頂',
+                steps: [
+                    { col: 6, from: '崁頂', to: '紅樹林', travelTime: 25 },
+                    { col: 7, from: '紅樹林', to: '中正紀念堂', travelTime: 39 },
+                    { col: 1, from: '中正紀念堂', to: '公館', travelTime: 6 }
+                ]
+            },
+            {
+                id: 'NORTH_DYNAMIC',
+                name: "往北：公館 ➔ 中正紀念堂 ➔ 紅樹林 ➔ 崁頂",
+                type: 'dynamic_north',
+                startFrom: '公館',
+                startStep: { col: 2, from: '公館', to: '中正紀念堂', travelTime: 6 }
+            }
+        ];
+
+        let isLocked = false;
+        let selectedMinutes = START_MINUTES;
+        let isProgrammaticScroll = false;
+
+        // 取得當前營運時間對應的分鐘數 (05:40 ~ 25:10)
+        function getCurrentServiceMinutes() {
+            const now = new Date();
+            let h = now.getHours();
+            let m = now.getMinutes();
+            if (h < 4) h += 24;
+            let total = h * 60 + m;
+            if (total < START_MINUTES) total = START_MINUTES;
+            if (total > END_MINUTES) total = END_MINUTES;
+            return total;
+        }
+
+        // 將 CSV 字串轉為標準營運分鐘數
+        function csvTimeToMinutes(t) {
+            if (!t) return null;
+            t = t.trim();
+            if (!/^\d{4}$/.test(t)) return null;
+            let h = parseInt(t.substring(0, 2), 10);
+            let m = parseInt(t.substring(2, 4), 10);
+            if (h < 4) h += 24;
+            return h * 60 + m;
+        }
+
+        // 分鐘數轉 HH:MM
+        function minutesToHHMM(mins) {
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+        }
+
+        function updateTimeDisplay() {
+            const displayEl = document.getElementById('display-selected-time');
+            const subEl = document.getElementById('display-sub-time');
+            const h = Math.floor(selectedMinutes / 60);
+            const m = selectedMinutes % 60;
+
+            displayEl.innerText = minutesToHHMM(selectedMinutes);
+
+            if (h >= 24) {
+                const standardH = (h - 24).toString().padStart(2, '0');
+                const standardM = m.toString().padStart(2, '0');
+                subEl.innerText = `(次日 ${standardH}:${standardM})`;
+                subEl.classList.remove('hidden');
+            } else {
+                subEl.classList.add('hidden');
+            }
+        }
+
+        function applyLockVisuals(locked) {
+            const btn = document.getElementById('lock-toggle');
+            const icon = document.getElementById('lock-icon');
+            const text = document.getElementById('lock-text-btn');
+
+            if (locked) {
+                btn.className = "btn-lock locked";
+                icon.innerText = "■";
+                text.innerText = "時間已鎖定";
+            } else {
+                btn.className = "btn-lock unlocked";
+                icon.innerText = "●";
+                text.innerText = "按此鎖定時刻表";
+            }
+        }
+
+        function buildTimelineTicks() {
+            const track = document.getElementById('timeline-track');
+            track.innerHTML = '';
+
+            for (let m = START_MINUTES; m <= END_MINUTES; m += STEP_MIN) {
+                const tick = document.createElement('div');
+                tick.className = 'flex flex-col items-center justify-end shrink-0 relative';
+                tick.style.width = `${STEP_MIN * PX_PER_MIN}px`;
+
+                const isHour = (m % 60 === 0);
+                const isHalfHour = (m % 30 === 0 && !isHour);
+                const isTen = (m % 10 === 0 && !isHour && !isHalfHour);
+                const isBoundary = (m === START_MINUTES || m === END_MINUTES);
+
+                let barStyle = 'h-2 bg-slate-700/60';
+                if (isBoundary || isHour) {
+                    barStyle = 'h-5 bg-cyan-400 shadow-[0_0_6px_rgba(0,242,255,0.6)]';
+                } else if (isHalfHour) {
+                    barStyle = 'h-3.5 bg-cyan-600/80';
+                } else if (isTen) {
+                    barStyle = 'h-2.5 bg-slate-500';
+                }
+
+                let labelHtml = '';
+                if (isHour || isBoundary) {
+                    const labelStr = minutesToHHMM(m);
+                    labelHtml = `<span class="absolute -top-4 text-[9px] font-mono cyber-font text-cyan-300 pointer-events-none whitespace-nowrap">${labelStr}</span>`;
+                } else if (isHalfHour) {
+                    labelHtml = `<span class="absolute -top-3.5 text-[8px] font-mono text-slate-500 pointer-events-none whitespace-nowrap">30</span>`;
+                }
+
+                tick.innerHTML = `
+                    ${labelHtml}
+                    <div class="w-[1.5px] ${barStyle}"></div>
+                `;
+                track.appendChild(tick);
+            }
+        }
+
+        function updateScrollerPadding() {
+            const scroller = document.getElementById('timeline-scroller');
+            const halfW = scroller.clientWidth / 2;
+            document.getElementById('timeline-pad-left').style.width = `${halfW}px`;
+            document.getElementById('timeline-pad-right').style.width = `${halfW}px`;
+        }
+
+        function scrollToMinute(targetMin, smooth = false) {
+            targetMin = Math.min(END_MINUTES, Math.max(START_MINUTES, targetMin));
+            selectedMinutes = targetMin;
+            const scroller = document.getElementById('timeline-scroller');
+            const targetX = (targetMin - START_MINUTES) * PX_PER_MIN;
+
+            isProgrammaticScroll = true;
+            if (smooth) {
+                scroller.scrollTo({ left: targetX, behavior: 'smooth' });
+            } else {
+                scroller.scrollLeft = targetX;
+            }
+            updateTimeDisplay();
+            updateUI();
+
+            setTimeout(() => {
+                isProgrammaticScroll = false;
+            }, 300);
+        }
+
+        function initScrollerEvents() {
+            const scroller = document.getElementById('timeline-scroller');
+            let isFramePending = false;
+
+            scroller.addEventListener('scroll', () => {
+                if (isProgrammaticScroll) return;
+
+                const scrollLeft = scroller.scrollLeft;
+                const calcMin = Math.min(END_MINUTES, Math.max(START_MINUTES, Math.round(START_MINUTES + scrollLeft / PX_PER_MIN)));
+
+                if (calcMin !== selectedMinutes) {
+                    selectedMinutes = calcMin;
+                    updateTimeDisplay();
+
+                    if (isLocked) {
+                        localStorage.setItem(LOCK_TIME_KEY, selectedMinutes.toString());
+                    }
+
+                    if (!isFramePending) {
+                        isFramePending = true;
+                        requestAnimationFrame(() => {
+                            updateUI();
+                            isFramePending = false;
+                        });
+                    }
+                }
+            });
+
+            scroller.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                scroller.scrollLeft += (e.deltaY || e.deltaX);
+            }, { passive: false });
+
+            let isDown = false;
+            let startX = 0;
+            let startScroll = 0;
+
+            scroller.addEventListener('mousedown', (e) => {
+                isDown = true;
+                startX = e.pageX - scroller.offsetLeft;
+                startScroll = scroller.scrollLeft;
+            });
+            window.addEventListener('mouseup', () => isDown = false);
+            scroller.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - scroller.offsetLeft;
+                scroller.scrollLeft = startScroll - (x - startX);
+            });
+        }
+
+        document.getElementById('lock-toggle').onclick = () => {
+            isLocked = !isLocked;
+            applyLockVisuals(isLocked);
+
+            if (isLocked) {
+                localStorage.setItem(LOCK_TIME_KEY, selectedMinutes.toString());
+            } else {
+                localStorage.removeItem(LOCK_TIME_KEY);
+                scrollToMinute(getCurrentServiceMinutes(), true);
+            }
+        };
+
+        document.getElementById('btn-sync-now').onclick = () => {
+            if (isLocked) {
+                isLocked = false;
+                localStorage.removeItem(LOCK_TIME_KEY);
+                applyLockVisuals(false);
+            }
+            scrollToMinute(getCurrentServiceMinutes(), true);
+        };
+
+        function renderStep(from, to, depMin, arrMin) {
+            return `
+                <div class="step-row">
+                    <div class="time-box">
+                        <span class="label-text text-cyan-900">發車</span>
+                        <span class="time-dep">${minutesToHHMM(depMin)}</span>
+                    </div>
+                    <div class="route-visual">
+                        <span class="station-name">${from}</span>
+                        <div class="connector-line"></div>
+                        <span class="station-name">${to}</span>
+                    </div>
+                    <div class="time-box">
+                        <span class="label-text text-green-900">抵達</span>
+                        <span class="time-arr">${minutesToHHMM(arrMin)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getBestTimeMinutes(rows, col, filterMin) {
+            let best = null;
+            for (let r = 1; r < rows.length; r++) {
+                if (!rows[r] || rows[r].length <= col) continue;
+                const t = rows[r][col];
+                const mins = csvTimeToMinutes(t);
+                if (mins !== null && mins >= filterMin) {
+                    if (best === null || mins < best) {
+                        best = mins;
+                    }
+                }
+            }
+            return best;
+        }
+
+        function updateUI() {
+            if (!window.csvData) return;
+            
+            const rows = window.csvData.split(/\r?\n/).map(r => r.split(',').map(c => c.trim()));
+            const container = document.getElementById('main-container');
+            container.innerHTML = '';
+
+            // 固定順序：依序為 JOURNEYS[0] (往南) 與 JOURNEYS[1] (往北)
+            JOURNEYS.forEach(journey => {
+                const card = document.createElement('div');
+                card.className = "journey-card flex flex-col";
+                let timelineHtml = "";
+                let possible = true;
+
+                if (journey.type === 'fixed') {
+                    // 南下固定三段轉乘
+                    let lastTime = selectedMinutes;
+                    for (let i = 0; i < journey.steps.length; i++) {
+                        const step = journey.steps[i];
+                        const dep = getBestTimeMinutes(rows, step.col, lastTime);
+                        if (dep === null) { 
+                            possible = false; 
+                            break; 
+                        }
+                        const arr = dep + step.travelTime;
+                        timelineHtml += renderStep(step.from, step.to, dep, arr);
+                        lastTime = arr;
+                    }
+                } else if (journey.type === 'dynamic_north') {
+                    // 北上智能邏輯
+                    const dep1 = getBestTimeMinutes(rows, journey.startStep.col, selectedMinutes);
+                    if (dep1 === null) {
+                        possible = false;
+                    } else {
+                        const arr1 = dep1 + journey.startStep.travelTime;
+                        
+                        const c3Time = getBestTimeMinutes(rows, 3, arr1);
+                        const c4Time = getBestTimeMinutes(rows, 4, arr1);
+
+                        let directCandidate = null;
+                        if (c3Time !== null) {
+                            const toRedArr = c3Time + 39;
+                            const depFinal = getBestTimeMinutes(rows, 8, toRedArr);
+                            if (depFinal !== null) {
+                                directCandidate = {
+                                    type: 'direct',
+                                    depNext: c3Time,
+                                    steps: [
+                                        { from: '中正紀念堂', to: '紅樹林', dep: c3Time, arr: toRedArr },
+                                        { from: '紅樹林', to: '崁頂', dep: depFinal, arr: depFinal + 25 }
+                                    ]
+                                };
+                            }
+                        }
+
+                        let qiyanCandidate = null;
+                        if (c4Time !== null) {
+                            const toQiyanArr = c4Time + 25;
+                            const qiyanDep = getBestTimeMinutes(rows, 5, toQiyanArr);
+                            if (qiyanDep !== null) {
+                                const toRedArr = qiyanDep + 14;
+                                const depFinal = getBestTimeMinutes(rows, 8, toRedArr);
+                                if (depFinal !== null) {
+                                    qiyanCandidate = {
+                                        type: 'qiyan',
+                                        depNext: c4Time,
+                                        steps: [
+                                            { from: '中正紀念堂', to: '奇岩', dep: c4Time, arr: toQiyanArr },
+                                            { from: '奇岩', to: '紅樹林', dep: qiyanDep, arr: toRedArr },
+                                            { from: '紅樹林', to: '崁頂', dep: depFinal, arr: depFinal + 25 }
+                                        ]
+                                    };
+                                }
+                            }
+                        }
+
+                        let chosenOption = null;
+                        if (c3Time !== null && (c4Time === null || c3Time <= c4Time)) {
+                            chosenOption = directCandidate || qiyanCandidate;
+                        } else if (c4Time !== null) {
+                            chosenOption = qiyanCandidate || directCandidate;
+                        } else {
+                            chosenOption = directCandidate || qiyanCandidate;
+                        }
+
+                        if (!chosenOption) {
+                            possible = false;
+                        } else {
+                            timelineHtml += renderStep(journey.startStep.from, journey.startStep.to, dep1, arr1);
+                            for (let s of chosenOption.steps) {
+                                timelineHtml += renderStep(s.from, s.to, s.dep, s.arr);
+                            }
+                        }
+                    }
+                }
+
+                if (!possible) {
+                    card.classList.add('out-of-service');
+                    card.innerHTML = `
+                        <div class="px-4 py-3 bg-red-950/20 border-b border-red-500/20">
+                            <h2 class="text-[9px] font-bold text-red-500 tracking-[0.2em] mb-0.5 uppercase">SECURITY ALERT: SERVICE ENDED</h2>
+                            <div class="text-xs font-bold text-red-200 tracking-wide">${journey.name}</div>
+                        </div>
+                        <div class="step-row justify-center py-10 flex-col gap-2">
+                            <div class="error-text">此基準時間已無可行轉乘班次</div>
+                            <div class="text-[10px] text-red-900 cyber-font">CRITICAL: NO_SCHEDULE_FOUND</div>
+                        </div>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div class="px-4 py-3 bg-slate-900/40 border-b border-white/5">
+                            <h2 class="text-[9px] font-bold text-cyan-800 tracking-[0.2em] mb-0.5 uppercase">智能導航協議</h2>
+                            <div class="text-xs font-bold text-slate-100 tracking-wide">${journey.name}</div>
+                        </div>
+                        ${timelineHtml}
+                    `;
+                }
+                container.appendChild(card);
+            });
+        }
+
+        async function init() {
+            buildTimelineTicks();
+            updateScrollerPadding();
+            initScrollerEvents();
+            window.addEventListener('resize', () => {
+                updateScrollerPadding();
+                scrollToMinute(selectedMinutes, false);
+            });
+
+            // 檢查鎖定狀態
+            const savedLockedTime = localStorage.getItem(LOCK_TIME_KEY);
+            if (savedLockedTime !== null) {
+                isLocked = true;
+                applyLockVisuals(true);
+                selectedMinutes = parseInt(savedLockedTime, 10);
+            } else {
+                isLocked = false;
+                applyLockVisuals(false);
+                selectedMinutes = getCurrentServiceMinutes();
+            }
+
+            scrollToMinute(selectedMinutes, false);
+
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            if (cachedData) {
+                window.csvData = cachedData;
+                updateUI();
+            }
+
+            try {
+                const res = await fetch(CSV_URL);
+                const text = await res.text();
+                window.csvData = text;
+                localStorage.setItem(CACHE_KEY, text);
+                updateUI();
+            } catch (e) {
+                console.error("CSV 更新失敗");
+            }
+
+            // 每 30 秒自動更新：若未鎖定且在當前時間附近，同步最新時間
+            setInterval(() => {
+                if (!isLocked) {
+                    const curNow = getCurrentServiceMinutes();
+                    if (Math.abs(selectedMinutes - curNow) <= 2) {
+                        scrollToMinute(curNow, true);
+                    } else {
+                        updateUI();
+                    }
+                }
+            }, 30000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

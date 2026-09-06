@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台北捷運即時動態</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen overflow-hidden select-none">
+
+  <!-- 極簡頂端列：僅保留純英文代號路線切換器 -->
+  <header class="bg-slate-900/95 backdrop-blur border-b border-slate-800/80 py-2 px-3 flex items-center justify-center shrink-0 z-30 shadow-md">
+    <nav class="flex items-center gap-1 sm:gap-2 bg-slate-950/80 p-1 rounded-xl border border-slate-800/70 shadow-inner">
+      <button onclick="switchLine('BR')" id="btn-BR" class="line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+        BR
+      </button>
+      <button onclick="switchLine('R')" id="btn-R" class="line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all bg-red-600 text-white shadow-sm hover:brightness-110">
+        R
+      </button>
+      <button onclick="switchLine('G')" id="btn-G" class="line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+        G
+      </button>
+      <button onclick="switchLine('O')" id="btn-O" class="line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+        O
+      </button>
+      <button onclick="switchLine('BL')" id="btn-BL" class="line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+        BL
+      </button>
+      <button onclick="switchLine('Y')" id="btn-Y" class="line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+        Y
+      </button>
+    </nav>
+  </header>
+
+  <!-- 主要內容區：預載 6 條路線的背景常駐 Iframe -->
+  <main id="iframe-container" class="flex-1 relative w-full h-full bg-white overflow-hidden">
+    
+    <!-- 載入中動畫層 (僅在首次載入未完成時顯示) -->
+    <div id="loading-overlay" class="absolute inset-0 bg-white/80 flex items-center justify-center z-20 pointer-events-none opacity-0">
+      <div class="w-8 h-8 border-3 border-slate-300 border-t-red-500 rounded-full animate-spin"></div>
+    </div>
+
+    <!-- 1. 文湖線 (BR) - 背景常駐 -->
+    <iframe
+      id="frame-BR"
+      src="https://web.metro.taipei/pages2026/WebCorner/BR"
+      class="metro-frame absolute inset-0 w-full h-full border-0 bg-white z-0 opacity-0 pointer-events-none"
+      allow="fullscreen; geolocation"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      onload="handleFrameLoad('BR')"
+      title="BR 文湖線">
+    </iframe>
+
+    <!-- 2. 淡水信義線 (R) - 預設顯示 (z-10, opacity-100) -->
+    <iframe
+      id="frame-R"
+      src="https://web.metro.taipei/pages2026/WebCorner/R"
+      class="metro-frame absolute inset-0 w-full h-full border-0 bg-white z-10 opacity-100 pointer-events-auto"
+      allow="fullscreen; geolocation"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      onload="handleFrameLoad('R')"
+      title="R 淡水信義線">
+    </iframe>
+
+    <!-- 3. 松山新店線 (G) - 背景常駐 -->
+    <iframe
+      id="frame-G"
+      src="https://web.metro.taipei/pages2026/WebCorner/G"
+      class="metro-frame absolute inset-0 w-full h-full border-0 bg-white z-0 opacity-0 pointer-events-none"
+      allow="fullscreen; geolocation"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      onload="handleFrameLoad('G')"
+      title="G 松山新店線">
+    </iframe>
+
+    <!-- 4. 中和新蘆線 (O) - 背景常駐 -->
+    <iframe
+      id="frame-O"
+      src="https://web.metro.taipei/pages2026/WebCorner/O"
+      class="metro-frame absolute inset-0 w-full h-full border-0 bg-white z-0 opacity-0 pointer-events-none"
+      allow="fullscreen; geolocation"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      onload="handleFrameLoad('O')"
+      title="O 中和新蘆線">
+    </iframe>
+
+    <!-- 5. 板南線 (BL) - 背景常駐 -->
+    <iframe
+      id="frame-BL"
+      src="https://web.metro.taipei/pages2026/WebCorner/BL"
+      class="metro-frame absolute inset-0 w-full h-full border-0 bg-white z-0 opacity-0 pointer-events-none"
+      allow="fullscreen; geolocation"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      onload="handleFrameLoad('BL')"
+      title="BL 板南線">
+    </iframe>
+
+    <!-- 6. 環狀線 (Y) - 背景常駐 -->
+    <iframe
+      id="frame-Y"
+      src="https://web.metro.taipei/pages2026/WebCorner/Y"
+      class="metro-frame absolute inset-0 w-full h-full border-0 bg-white z-0 opacity-0 pointer-events-none"
+      allow="fullscreen; geolocation"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      onload="handleFrameLoad('Y')"
+      title="Y 環狀線">
+    </iframe>
+  </main>
+
+  <script>
+    // 路線樣式與網址配置
+    const METRO_LINES = {
+      'BR': {
+        activeClass: 'bg-amber-800 text-white shadow-sm',
+        url: 'https://web.metro.taipei/pages2026/WebCorner/BR'
+      },
+      'R': {
+        activeClass: 'bg-red-600 text-white shadow-sm',
+        url: 'https://web.metro.taipei/pages2026/WebCorner/R'
+      },
+      'G': {
+        activeClass: 'bg-emerald-600 text-white shadow-sm',
+        url: 'https://web.metro.taipei/pages2026/WebCorner/G'
+      },
+      'O': {
+        activeClass: 'bg-amber-500 text-white shadow-sm',
+        url: 'https://web.metro.taipei/pages2026/WebCorner/O'
+      },
+      'BL': {
+        activeClass: 'bg-blue-600 text-white shadow-sm',
+        url: 'https://web.metro.taipei/pages2026/WebCorner/BL'
+      },
+      'Y': {
+        activeClass: 'bg-yellow-400 text-slate-950 shadow-sm',
+        url: 'https://web.metro.taipei/pages2026/WebCorner/Y'
+      }
+    };
+
+    // 各路線 iframe 載入狀態
+    const frameStatus = {
+      'BR': false,
+      'R': false,
+      'G': false,
+      'O': false,
+      'BL': false,
+      'Y': false
+    };
+
+    let currentLine = 'R';
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    // iframe 載入完成回呼
+    function handleFrameLoad(lineCode) {
+      frameStatus[lineCode] = true;
+      if (currentLine === lineCode) {
+        loadingOverlay.classList.add('opacity-0');
+      }
+    }
+
+    // 秒速切換路線 (無損 DOM / 背景常駐)
+    function switchLine(lineCode) {
+      if (!METRO_LINES[lineCode] || currentLine === lineCode) return;
+      
+      const prevLine = currentLine;
+      currentLine = lineCode;
+      const info = METRO_LINES[lineCode];
+
+      // 1. 瞬間切換 iframe 層級與可見度（無動畫過渡，避免暗色漏出）
+      const prevFrame = document.getElementById(`frame-${prevLine}`);
+      const nextFrame = document.getElementById(`frame-${lineCode}`);
+
+      if (prevFrame) {
+        prevFrame.className = 'metro-frame absolute inset-0 w-full h-full border-0 bg-white z-0 opacity-0 pointer-events-none';
+      }
+      if (nextFrame) {
+        nextFrame.className = 'metro-frame absolute inset-0 w-full h-full border-0 bg-white z-10 opacity-100 pointer-events-auto';
+      }
+
+      // 2. 更新按鈕啟用狀態樣式
+      document.querySelectorAll('.line-btn').forEach(btn => {
+        btn.className = 'line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all text-slate-400 hover:text-white hover:bg-slate-800/60';
+      });
+
+      const activeBtn = document.getElementById(`btn-${lineCode}`);
+      if (activeBtn) {
+        activeBtn.className = `line-btn px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-black transition-all ${info.activeClass} hover:brightness-110`;
+      }
+    }
+
+    // 防止載入過久遮罩未消失
+    setTimeout(() => {
+      loadingOverlay.classList.add('opacity-0');
+    }, 3000);
+  </script>
+</body>
+</html>

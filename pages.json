@@ -1,0 +1,12 @@
+[
+    {
+        "name": "自動通勤",
+        "path": "./school.html",
+        "icon": "fa-solid fa-school"
+    },
+    {
+        "name": "即時捷運",
+        "path": "./metro.html",
+        "icon": "fa-solid fa-train"
+    }
+]

@@ -1,504 +1,455 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>崁頂公館通勤系統</title>
+    <link rel="apple-touch-icon" href="./icon.jpeg">
+    <title>NTU轉乘系統 - 主控制台</title>
     
+    <!-- 圖示與字型 -->
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/Bobkao0527/bobtaipeiMRT/20296ecd31b8fa2372a545c4e5f991954d6b29ac/icon.jpeg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
         
         :root {
-            --neon-blue: #00f2ff;
-            --neon-green: #4ade80;
-            --neon-red: #ff4444;
-            --dark-bg: #020617;
+            --neon-cyan: #00f2ff;
+            --neon-blue: #3b82f6;
+            --neon-purple: #a855f7;
+            --neon-green: #10b981;
+            --neon-red: #ef4444;
+            --dark-bg: #030712;
+            --glass-bg: rgba(15, 23, 42, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body { 
             font-family: 'Noto Sans TC', sans-serif; 
             background-color: var(--dark-bg);
-            color: #e2e8f0;
-            padding-top: env(safe-area-inset-top);
+            color: #f1f5f9;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 242, 255, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
         }
 
         .cyber-font {
             font-family: 'Orbitron', sans-serif;
         }
 
-        .journey-card {
-            background: rgba(15, 23, 42, 0.8);
-            border-radius: 1.25rem;
-            border: 1px solid rgba(0, 242, 255, 0.15);
-            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+        .tech-font {
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        /* 霓虹文字與邊框發光特效 */
+        .neon-glow-cyan {
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.7), 0 0 20px rgba(0, 242, 255, 0.3);
+        }
+
+        .neon-border-cyan {
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.25), inset 0 0 15px rgba(0, 242, 255, 0.1);
+        }
+
+        /* Iframe 主容器 */
+        .iframe-wrapper {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            background: #000000;
             overflow: hidden;
-            backdrop-filter: blur(12px);
-            position: relative;
-            transition: all 0.3s ease;
         }
 
-        .journey-card.out-of-service {
-            border: 1px solid rgba(255, 68, 68, 0.4);
-        }
-
-        .journey-card::before {
-            content: '';
+        /* 多重 Iframe 專用獨立樣式 */
+        .app-iframe {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--neon-blue), var(--neon-green), transparent);
-            animation: scan 4s linear infinite;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.99);
+            z-index: 1;
         }
 
-        @keyframes scan {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        .app-iframe.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+            z-index: 10;
         }
 
-        .step-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 1.25rem 0.75rem;
+        /* 磨砂玻璃面板 */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        /* 底部導覽頁籤樣式 */
+        .nav-tab {
             position: relative;
-            background: linear-gradient(90deg, rgba(0, 242, 255, 0.03) 0%, rgba(74, 222, 128, 0.03) 100%);
-        }
-
-        .step-row:not(:last-child) {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .time-box {
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 62px;
-        }
-
-        .time-dep {
-            @apply cyber-font text-xl font-bold tracking-tight;
-            color: var(--neon-blue);
-            text-shadow: 0 0 12px rgba(0, 242, 255, 0.6);
-        }
-
-        .time-arr {
-            @apply cyber-font text-xl font-bold tracking-tight;
-            color: var(--neon-green);
-            text-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
-        }
-
-        .route-visual {
+            justify-content: center;
             flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 6px;
+            padding: 0.5rem 0.25rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            color: #64748b;
+            border-radius: 0.5rem;
+            overflow: hidden;
         }
 
-        .station-name {
-            @apply text-[14px] font-bold text-white whitespace-nowrap flex flex-col items-center;
-        }
-
-        .connector-line {
-            flex: 1;
-            height: 1px;
-            background: linear-gradient(90deg, var(--neon-blue) 0%, var(--neon-green) 100%);
-            position: relative;
-            min-width: 25px;
-            opacity: 0.6;
-        }
-
-        .btn-next-bus {
-            @apply w-full py-4 px-4 bg-slate-900/60 text-cyan-400 font-bold text-xs tracking-[0.2em] transition-all active:bg-cyan-950/50 flex items-center justify-center gap-2 border-t border-white/5;
-        }
-
-        .label-text {
-            @apply text-[8px] font-bold uppercase tracking-widest mb-0.5;
-        }
-
-        .btn-lock {
-            @apply flex items-center justify-center gap-2 px-3 py-2 rounded-full border-2 transition-all duration-300 text-[11px] font-black tracking-[0.05em] shadow-lg active:scale-95;
-            min-width: 130px;
-        }
-        .btn-lock.unlocked {
-            @apply border-emerald-500/50 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10;
-        }
-        .btn-lock.locked {
-            @apply border-red-500 text-red-500 bg-red-500/10 animate-pulse;
-        }
-
-        .error-text {
-            @apply text-red-500 font-bold text-sm cyber-font tracking-tighter;
-        }
-
-        /* 時刻表彈窗樣式 */
-        #data-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(2, 6, 23, 0.95);
-            z-index: 1000;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-        }
-        .table-container {
-            width: 100%;
-            height: 85%;
-            overflow: auto;
-            border: 1px solid rgba(0, 242, 255, 0.3);
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.5);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-        th {
-            background: rgba(0, 242, 255, 0.1);
-            color: var(--neon-blue);
-            padding: 12px 8px;
-            text-align: center;
-            border-bottom: 2px solid var(--neon-blue);
-            position: sticky;
+        .nav-tab::before {
+            content: '';
+            position: absolute;
             top: 0;
-            z-index: 10;
-            white-space: nowrap;
+            left: 50%;
+            transform: translateX(-50%) scaleX(0);
+            width: 60%;
+            height: 2px;
+            background: var(--neon-cyan);
+            border-radius: 999px;
+            box-shadow: 0 0 10px var(--neon-cyan);
+            transition: transform 0.3s ease;
         }
-        td {
-            padding: 8px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+        .nav-tab:hover {
             color: #cbd5e1;
-            font-family: 'Orbitron', sans-serif;
+            background: rgba(255, 255, 255, 0.03);
         }
-        tr:nth-child(even) {
-            background: rgba(255, 255, 255, 0.02);
+
+        .nav-tab.active {
+            color: var(--neon-cyan);
+            background: linear-gradient(180deg, rgba(0, 242, 255, 0.12) 0%, rgba(0, 242, 255, 0) 100%);
+        }
+
+        .nav-tab.active::before {
+            transform: translateX(-50%) scaleX(1);
+        }
+
+        .nav-tab i {
+            font-size: 1.15rem;
+            margin-bottom: 0.25rem;
+            transition: transform 0.25s ease, filter 0.25s ease;
+        }
+
+        .nav-tab.active i {
+            transform: translateY(-2px);
+            filter: drop-shadow(0 0 8px rgba(0, 242, 255, 0.8));
+        }
+
+        .nav-tab span {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            max-width: 100%;
+        }
+
+        /* 旋轉微光動畫 */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        .pulse-dot {
+            animation: pulse-glow 2s infinite ease-in-out;
         }
     </style>
 </head>
-<body class="min-h-screen pb-20">
+<body>
 
-    <div class="max-w-md mx-auto px-4 py-6">
-        <header class="mb-6 flex justify-between items-center border-b border-slate-800 pb-5">
-            <div class="flex-1">
-                <div class="flex items-center gap-2">
-                    <h1 id="title-text" class="text-lg cyber-font font-bold tracking-[0.2em] text-white">崁頂公館通勤系統</h1>
+    <!-- 頂部高科技狀態列 -->
+    <header class="glass-panel flex-none px-4 py-2.5 border-b border-cyan-500/20 z-30 shadow-xl relative">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            
+            <!-- 左側系統標題與圖示 -->
+            <div class="flex items-center gap-3">
+                <div class="relative flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-400">
+                    <i class="fa-solid fa-compass-drafting text-sm"></i>
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                    </span>
                 </div>
-                <div class="text-[10px] font-bold text-slate-500 mt-1 tracking-widest uppercase">
-                    Commute Intelligence System
+                <div>
+                    <h1 id="title-text" class="text-sm md:text-base cyber-font font-black tracking-widest text-white flex items-center gap-2">
+                        <span>NTU</span>
+                        <span class="text-cyan-400 neon-glow-cyan">TRANSIT</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 tech-font hidden sm:inline-block">v2.5 SYS</span>
+                    </h1>
+                    <p class="text-[10px] text-slate-400 tracking-wider font-mono flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
+                        <span class="text-emerald-400 font-bold">ONLINE</span>
+                        <span class="text-slate-600">|</span>
+                        <span>即時通勤計算系統</span>
+                    </p>
                 </div>
             </div>
-            
-            <div class="flex flex-col items-end gap-3">
+
+            <!-- 右側控制與時間 display -->
+            <div class="flex items-center gap-3">
+                <!-- 手動重新整理當前頁面按鈕 -->
+                <button onclick="reloadCurrentPage()" title="重新整理當前頁面" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-900/60 border border-slate-700/60 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50 transition-all active:scale-95">
+                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                </button>
+
+                <div class="h-6 w-[1px] bg-slate-800"></div>
+
+                <!-- 數位時間 -->
                 <div class="text-right">
-                    <p id="current-time-display" class="cyber-font text-2xl font-bold text-cyan-400">--:--</p>
+                    <p id="current-time-display" class="cyber-font text-lg md:text-xl font-black text-cyan-400 neon-glow-cyan leading-none">--:--:--</p>
+                    <p class="text-[9px] tech-font text-slate-400 tracking-widest uppercase">SYSTEM CLOCK</p>
                 </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 中間 Iframe 內容區域 -->
+    <main class="iframe-wrapper">
+        <!-- 載入中過渡動畫 -->
+        <div id="frame-loader" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-4 z-25 transition-opacity duration-300 pointer-events-none opacity-0">
+            <div class="relative w-16 h-16 flex items-center justify-center">
+                <!-- 雙圈旋轉特效 -->
+                <div class="absolute inset-0 border-2 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
+                <div class="absolute inset-2 border-2 border-purple-500/20 border-b-purple-400 rounded-full animate-spin" style="animation-direction: reverse; animation-duration: 1.5s;"></div>
+                <i class="fa-solid fa-microchip text-cyan-400 text-lg animate-pulse"></i>
+            </div>
+            <div class="text-center">
+                <p class="cyber-font text-xs text-cyan-400 tracking-[0.3em] uppercase font-bold animate-pulse">
+                    LOADING_MODULE
+                </p>
+                <p class="text-[10px] text-slate-500 font-mono mt-1">ESTABLISHING DATA CONNECTION...</p>
+            </div>
+        </div>
+
+        <!-- 讀取失敗提示視窗 (精簡版：無範例匡，直觀提示) -->
+        <div id="error-display" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-center p-6 text-center z-40">
+            <div class="p-6 rounded-2xl border border-red-500/30 bg-slate-900/90 max-w-sm w-full space-y-4 shadow-2xl shadow-red-950/40 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent"></div>
                 
-                <button id="lock-toggle" class="btn-lock unlocked">
-                    <span id="lock-icon">●</span>
-                    <span id="lock-text-btn">按此鎖定時刻表</span>
+                <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto text-xl">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+
+                <div>
+                    <h3 class="cyber-font text-base font-bold text-red-400 tracking-wider">讀取 pages.json 失敗</h3>
+                    <p class="text-xs text-slate-400 mt-1">無法獲取選單資料，請確認 <code class="text-red-300 font-mono">pages.json</code> 是否已正確放置於同層目錄中。</p>
+                </div>
+
+                <button onclick="loadPagesJson()" class="w-full py-2.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 cyber-font text-xs rounded-xl tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                    <span>RETRY SYSTEM</span>
                 </button>
             </div>
-        </header>
-
-        <div id="main-container" class="space-y-6">
-            <div class="flex flex-col items-center justify-center py-20 gap-4">
-                <div class="w-10 h-10 border border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
-                <p class="cyber-font text-[10px] text-cyan-900 tracking-[0.5em]">系統初始化中</p>
-            </div>
         </div>
 
-        <!-- 查看全部時刻表按鈕 -->
-        <div class="mt-10 mb-10">
-            <button onclick="openModal()" class="w-full py-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-cyan-400 cyber-font text-xs tracking-widest font-bold active:bg-cyan-500/20 transition-all">
-                VIEW FULL TIMETABLE / 查看全部時刻表
-            </button>
+        <!-- 動態堆疊的常駐 iframe 容器 -->
+        <div id="iframe-stack" class="w-full h-full relative">
+            <!-- JavaScript 會在這裡動態插入多個 <iframe class="app-iframe"> -->
         </div>
-    </div>
+    </main>
 
-    <!-- 數據彈窗 -->
-    <div id="data-modal">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-white cyber-font font-bold tracking-widest">RAW DATA (COL 0-8)</h2>
-            <button onclick="closeModal()" class="text-red-400 cyber-font font-bold p-2 border border-red-400/30 rounded">CLOSE [X]</button>
+    <!-- 底部頁面切換欄 (頁籤選單) -->
+    <nav class="glass-panel flex-none border-t border-cyan-500/20 px-3 py-1.5 z-30 shadow-2xl">
+        <div id="nav-container" class="max-w-md mx-auto flex justify-around items-center gap-1">
+            <!-- 由 JavaScript 動態抓取 pages.json 後填入 -->
         </div>
-        <div class="table-container" id="table-wrap">
-            <table id="raw-table">
-                <!-- JavaScript 動態插入 -->
-            </table>
-        </div>
-    </div>
+    </nav>
 
     <script>
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTW2l0HWECp7aHxDU3gO4KCzqYnTfwuujaHqYnciuMgyF3LbEJQQVq-aGPKBYLEtNnt46n4y48Adjl5/pub?output=csv';
-        const CACHE_KEY = 'bus_timetable_data_universal';
-        const LOCK_KEY = 'bus_locked_data_universal';
+        let pagesData = [];
+        let activePageIndex = -1;
+        const iframesMap = {}; // 快取 iframe 實體 DOM
+        const iframeLoadedMap = {}; // 紀錄各 iframe 是否已載入完畢
+        let lastClickTime = 0;
 
-        let journeyOffsets = { 'SOUTH_LONG': 0, 'NORTH_LONG': 0 };
-        let isLocked = false;
-
+        // 時鐘更新函數 (包含秒數)
         function updateClock() {
             const now = new Date();
             const hh = now.getHours().toString().padStart(2, '0');
             const mm = now.getMinutes().toString().padStart(2, '0');
-            document.getElementById('current-time-display').innerText = `${hh}:${mm}`;
+            const ss = now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('current-time-display').innerText = `${hh}:${mm}:${ss}`;
         }
 
-        function addMinutes(hhmm, mins) {
-            let h = parseInt(hhmm.substring(0, 2)), m = parseInt(hhmm.substring(2, 4)) + mins;
-            h += Math.floor(m / 60); m = m % 60;
-            return h.toString().padStart(2, '0') + m.toString().padStart(2, '0');
-        }
-
-        function formatTime(hhmm) { 
-            let h = parseInt(hhmm.substring(0, 2)) % 24;
-            let m = hhmm.substring(2, 4);
-            return h.toString().padStart(2, '0') + ':' + m;
-        }
-
-        function toggleNextBus(journeyId) {
-            if (isLocked) return;
-            journeyOffsets[journeyId] = (journeyOffsets[journeyId] + 1) % 3;
-            updateUI();
-        }
-
-        function applyLockVisuals(locked) {
-            const btn = document.getElementById('lock-toggle');
-            const icon = document.getElementById('lock-icon');
-            const text = document.getElementById('lock-text-btn');
-            const title = document.getElementById('title-text');
-
-            if (locked) {
-                btn.className = "btn-lock locked";
-                icon.innerText = "■";
-                text.innerText = "時間已鎖定";
-                title.innerText = "時間已錨定";
-                title.classList.add('text-red-500');
+        // 隱藏/顯示 Loader 畫面
+        function setLoaderState(show) {
+            const loader = document.getElementById('frame-loader');
+            if (show) {
+                loader.classList.remove('opacity-0', 'pointer-events-none');
             } else {
-                btn.className = "btn-lock unlocked";
-                icon.innerText = "●";
-                text.innerText = "按此鎖定時刻表";
-                title.innerText = "崁頂公館通勤系統";
-                title.classList.remove('text-red-500');
+                loader.classList.add('opacity-0', 'pointer-events-none');
             }
         }
 
-        document.getElementById('lock-toggle').onclick = () => {
-            isLocked = !isLocked;
-            applyLockVisuals(isLocked);
-            if (isLocked) {
-                const currentContent = document.getElementById('main-container').innerHTML;
-                localStorage.setItem(LOCK_KEY, JSON.stringify({
-                    html: currentContent,
-                    offsets: journeyOffsets
-                }));
-            } else {
-                localStorage.removeItem(LOCK_KEY);
-                updateUI();
+        // 重新整理當前頁面
+        function reloadCurrentPage() {
+            if (activePageIndex >= 0) {
+                switchPage(activePageIndex, true);
             }
-        };
+        }
 
-        async function init() {
-            updateClock();
-            const cachedData = localStorage.getItem(CACHE_KEY);
-            if (cachedData) window.csvData = cachedData;
+        // 高效秒切頁面 (背景 iframes 常駐)
+        function switchPage(index, forceReload = false) {
+            if (!pagesData[index]) return;
 
-            const lockStore = localStorage.getItem(LOCK_KEY);
-            if (lockStore) {
-                const state = JSON.parse(lockStore);
-                isLocked = true;
-                journeyOffsets = state.offsets;
-                applyLockVisuals(true);
-                document.getElementById('main-container').innerHTML = state.html;
-            } else {
-                updateUI();
+            // 雙擊當前 Tab 可強制重新整理該 iframe
+            const now = Date.now();
+            if (index === activePageIndex && !forceReload) {
+                if (now - lastClickTime < 300) {
+                    forceReload = true;
+                }
             }
+            lastClickTime = now;
+
+            const targetFrame = iframesMap[index];
+            if (!targetFrame) return;
+
+            if (forceReload) {
+                iframeLoadedMap[index] = false;
+                setLoaderState(true);
+                targetFrame.src = pagesData[index].path;
+            }
+
+            activePageIndex = index;
+
+            // 1. 若該 iframe 尚未載入完成，顯示載入動畫；若已載入，立即隱藏
+            if (!iframeLoadedMap[index]) {
+                setLoaderState(true);
+            } else {
+                setLoaderState(false);
+            }
+
+            // 2. 切換各 iframe 可視性 (透過 active class 控制 opacity 與 transform)
+            Object.keys(iframesMap).forEach(key => {
+                const k = Number(key);
+                if (k === index) {
+                    iframesMap[k].classList.add('active');
+                } else {
+                    iframesMap[k].classList.remove('active');
+                }
+            });
+
+            // 3. 更新底部導覽按鈕 Active 高亮狀態
+            document.querySelectorAll('.nav-tab').forEach((tab, i) => {
+                if (i === index) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+        }
+
+        // 讀取 pages.json 並為所有頁面創建常駐 background iframe
+        async function loadPagesJson() {
+            const errorDisplay = document.getElementById('error-display');
+            const navContainer = document.getElementById('nav-container');
+            const iframeStack = document.getElementById('iframe-stack');
+            
+            errorDisplay.classList.add('hidden');
+            navContainer.innerHTML = '';
+            iframeStack.innerHTML = '';
 
             try {
-                const res = await fetch(CSV_URL);
-                const text = await res.text();
-                window.csvData = text;
-                localStorage.setItem(CACHE_KEY, text);
-                if (!isLocked) updateUI();
-            } catch (e) {
-                console.error("資料更新失敗");
-            }
-
-            setInterval(updateClock, 10000);
-            setInterval(() => { if (!isLocked) updateUI(); }, 30000);
-        }
-
-        function renderStep(from, to, depTime, arrTime) {
-            return `
-                <div class="step-row">
-                    <div class="time-box">
-                        <span class="label-text text-cyan-900">發車</span>
-                        <span class="time-dep">${formatTime(depTime)}</span>
-                    </div>
-                    <div class="route-visual">
-                        <span class="station-name">${from}</span>
-                        <div class="connector-line"></div>
-                        <span class="station-name">${to}</span>
-                    </div>
-                    <div class="time-box">
-                        <span class="label-text text-green-900">抵達</span>
-                        <span class="time-arr">${formatTime(arrTime)}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        function getBestTime(rows, col, filterTime, offset = 0) {
-            let data = [];
-            for (let r = 1; r < rows.length; r++) {
-                const t = rows[r][col];
-                if (t && /^\d{4}$/.test(t)) {
-                    if (t >= filterTime) data.push(t);
-                }
-            }
-            data.sort();
-            return data[offset] || null;
-        }
-
-        function openModal() {
-            if (!window.csvData) return;
-            const rows = window.csvData.split('\n').map(r => r.split(',').map(c => c.trim()));
-            const table = document.getElementById('raw-table');
-            table.innerHTML = '';
-
-            // 建立表頭 (Row 0) -> 格式「站點 > 方向」
-            const headerRow = document.createElement('tr');
-            const headers = rows[0];
-            for (let i = 0; i <= 8; i++) {
-                const th = document.createElement('th');
-                const title = headers[i] || `Col ${i}`;
-                // 處理標題格式：中正紀念堂 往淡水 -> 中正紀念堂 > 往淡水
-                th.innerText = title.replace(/\s+/g, ' > ');
-                headerRow.appendChild(th);
-            }
-            table.appendChild(headerRow);
-
-            // 填充數據列
-            for (let r = 1; r < rows.length; r++) {
-                const tr = document.createElement('tr');
-                let hasData = false;
-                for (let i = 0; i <= 8; i++) {
-                    const td = document.createElement('td');
-                    const val = rows[r][i] || '';
-                    td.innerText = val;
-                    tr.appendChild(td);
-                    if (val) hasData = true;
-                }
-                if (hasData) table.appendChild(tr);
-            }
-
-            document.getElementById('data-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden'; // 禁止底層滾動
-        }
-
-        function closeModal() {
-            document.getElementById('data-modal').style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-        function updateUI() {
-            if (isLocked || !window.csvData) return;
-            
-            const rows = window.csvData.split('\n').map(r => r.split(',').map(c => c.trim()));
-            const container = document.getElementById('main-container');
-            const now = new Date();
-            let currentH = now.getHours();
-            let currentM = now.getMinutes().toString().padStart(2, '0');
-            let currentHHMM = (currentH < 4 ? (currentH + 24) : currentH).toString().padStart(2, '0') + currentM;
-            
-            container.innerHTML = '';
-
-            // --- 往南：崁頂(6) -> 紅樹林(7) -> 中正(1) -> 公館 ---
-            const southOffset = journeyOffsets['SOUTH_LONG'];
-            let sHtml = "";
-            let sPossible = true;
-            let sTime = currentHHMM;
-
-            let s1 = getBestTime(rows, 6, sTime, southOffset);
-            if (!s1) sPossible = false;
-            else {
-                let s1Arr = addMinutes(s1, 25);
-                sHtml += renderStep("崁頂", "紅樹林", s1, s1Arr);
-                let s2 = getBestTime(rows, 7, s1Arr, 0);
-                if (!s2) sPossible = false;
-                else {
-                    let s2Arr = addMinutes(s2, 39);
-                    sHtml += renderStep("紅樹林", "中正紀念堂", s2, s2Arr);
-                    let s3 = getBestTime(rows, 1, s2Arr, 0);
-                    if (!s3) sPossible = false;
-                    else {
-                        sHtml += renderStep("中正紀念堂", "公館", s3, addMinutes(s3, 6));
-                    }
-                }
-            }
-            renderCard("往南：崁頂 ➔ 紅樹林 ➔ 中正 ➔ 公館", sHtml, sPossible, southOffset, 'SOUTH_LONG');
-
-            // --- 往北：公館(2) -> 中正(3,4) 邏輯 ---
-            const northOffset = journeyOffsets['NORTH_LONG'];
-            let nHtml = "";
-            let nPossible = true;
-            let nTime = currentHHMM;
-
-            let n1 = getBestTime(rows, 2, nTime, northOffset);
-            if (!n1) nPossible = false;
-            else {
-                let n1Arr = addMinutes(n1, 6);
-                nHtml += renderStep("公館", "中正紀念堂", n1, n1Arr);
+                // 自動發送請求讀取同層級 pages.json (避免快取)
+                const res = await fetch(`./pages.json?t=${Date.now()}`);
                 
-                let c3Time = getBestTime(rows, 3, n1Arr, 0); // 往淡水直達
-                let c4Time = getBestTime(rows, 4, n1Arr, 0); // 往北投區間
-
-                if (c3Time && (!c4Time || c3Time <= c4Time)) {
-                    let toRedArr = addMinutes(c3Time, 39);
-                    nHtml += renderStep("中正紀念堂", "紅樹林", c3Time, toRedArr);
-                    let n3 = getBestTime(rows, 8, toRedArr, 0);
-                    if (!n3) nPossible = false;
-                    else nHtml += renderStep("紅樹林", "崁頂", n3, addMinutes(n3, 25));
-                } 
-                else if (c4Time) {
-                    let toQiyanArr = addMinutes(c4Time, 25);
-                    nHtml += renderStep("中正紀念堂", "奇岩", c4Time, toQiyanArr);
-                    let qiyanDep = getBestTime(rows, 5, toQiyanArr, 0);
-                    if (!qiyanDep) nPossible = false;
-                    else {
-                        let toRedArr = addMinutes(qiyanDep, 14);
-                        nHtml += renderStep("奇岩", "紅樹林", qiyanDep, toRedArr);
-                        let n3 = getBestTime(rows, 8, toRedArr, 0);
-                        if (!n3) nPossible = false;
-                        else nHtml += renderStep("紅樹林", "崁頂", n3, addMinutes(n3, 25));
-                    }
-                } else { nPossible = false; }
-            }
-            renderCard("往北：公館 ➔ 中正 ➔ 紅樹林 ➔ 崁頂", nHtml, nPossible, northOffset, 'NORTH_LONG');
-
-            function renderCard(name, html, possible, offset, id) {
-                const card = document.createElement('div');
-                card.className = "journey-card flex flex-col" + (possible ? "" : " out-of-service");
-                if (!possible) {
-                    card.innerHTML = `<div class="px-4 py-3 bg-red-950/20"><div class="text-xs font-bold text-red-200">${name}</div></div><div class="py-10 text-center error-text">目前無可用班次</div>`;
-                } else {
-                    card.innerHTML = `<div class="px-4 py-3 bg-slate-900/40 border-b border-white/5"><div class="text-xs font-bold text-slate-100 tracking-wide">${name}</div></div>` + html;
-                    const btn = document.createElement('button');
-                    btn.className = "btn-next-bus cyber-font";
-                    btn.innerHTML = `<span>掃描後續班次 (+${offset})</span>`;
-                    btn.onclick = () => toggleNextBus(id);
-                    card.appendChild(btn);
+                if (!res.ok) {
+                    throw new Error(`HTTP Error Status: ${res.status}`);
                 }
-                container.appendChild(card);
+
+                pagesData = await res.json();
+
+                if (!Array.isArray(pagesData) || pagesData.length === 0) {
+                    throw new Error("pages.json 資料格式不正確或為空陣列");
+                }
+
+                // 為每一個頁面建立專屬的背景常駐 Iframe 與底部按鈕
+                pagesData.forEach((page, idx) => {
+                    // --- 建立常駐 Iframe ---
+                    const frame = document.createElement('iframe');
+                    frame.id = `app-frame-${idx}`;
+                    frame.className = `app-iframe ${idx === 0 ? 'active' : ''}`;
+                    frame.name = `app-frame-${idx}`;
+                    
+                    // 監聽各 iframe 的載入完成事件
+                    iframeLoadedMap[idx] = false;
+                    frame.addEventListener('load', () => {
+                        iframeLoadedMap[idx] = true;
+                        if (activePageIndex === idx) {
+                            setLoaderState(false);
+                        }
+                    });
+
+                    // 設定 iframe 路徑
+                    frame.src = page.path;
+                    iframeStack.appendChild(frame);
+                    iframesMap[idx] = frame;
+
+                    // --- 建立底部導覽選單按鈕 ---
+                    const button = document.createElement('button');
+                    button.className = `nav-tab ${idx === 0 ? 'active' : ''}`;
+                    
+                    const iconClass = page.icon || 'fa-solid fa-window-maximize';
+                    const pageName = page.name || `頁面 ${idx + 1}`;
+
+                    button.innerHTML = `
+                        <i class="${iconClass}"></i>
+                        <span>${pageName}</span>
+                    `;
+
+                    button.onclick = () => switchPage(idx);
+                    navContainer.appendChild(button);
+                });
+
+                // 預設切換至第一個頁面
+                switchPage(0);
+
+            } catch (err) {
+                console.error("載入 pages.json 失敗:", err);
+                errorDisplay.classList.remove('hidden');
             }
         }
 
-        init();
+        // 支援鍵盤數字鍵切換頁籤 (1 ~ 9)
+        window.addEventListener('keydown', (e) => {
+            const keyNum = parseInt(e.key);
+            if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= pagesData.length) {
+                switchPage(keyNum - 1);
+            }
+        });
+
+        // 初始化系統
+        window.addEventListener('DOMContentLoaded', () => {
+            updateClock();
+            setInterval(updateClock, 1000);
+            loadPagesJson();
+        });
     </script>
 </body>
 </html>
