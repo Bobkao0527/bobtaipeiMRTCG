@@ -156,6 +156,16 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        /* 馬達刻度指針彈動動畫 */
+        @keyframes needle-snap {
+            0% { transform: translate(-50%, 0) scaleX(1); }
+            40% { transform: translate(-50%, -1px) scaleX(1.4); filter: brightness(1.5); }
+            100% { transform: translate(-50%, 0) scaleX(1); }
+        }
+        .needle-active {
+            animation: needle-snap 0.08s ease-out;
+        }
     </style>
 </head>
 <body class="min-h-screen pb-10">
@@ -180,6 +190,10 @@
                 <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f2ff]"></span>
                     <span class="text-[10px] font-bold text-cyan-400 tracking-[0.2em] uppercase">基準發車時刻</span>
+                    <!-- 觸覺馬達效果啟動指示 -->
+                    <span class="text-[8px] bg-cyan-950 text-cyan-400/80 px-1.5 py-0.5 rounded border border-cyan-500/30 flex items-center gap-1">
+                        <span class="w-1 h-1 rounded-full bg-emerald-400"></span>HAPTIC
+                    </span>
                 </div>
                 
                 <div class="flex items-center gap-2.5">
@@ -197,8 +211,8 @@
 
             <!-- 橫向滑動軸容器 -->
             <div class="relative w-full rounded-xl bg-slate-950/80 border border-cyan-500/25 py-2 overflow-hidden shadow-inner">
-                <!-- 中央瞄準紅外線指針 -->
-                <div class="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-[2px] bg-cyan-400 z-20 pointer-events-none shadow-[0_0_8px_#00f2ff]">
+                <!-- 中央瞄準紅外線指針（具備馬達觸發彈動動畫） -->
+                <div id="aim-needle" class="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-[2px] bg-cyan-400 z-20 pointer-events-none shadow-[0_0_8px_#00f2ff] transition-all">
                     <div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[4px] border-x-transparent border-t-[6px] border-t-cyan-400"></div>
                     <div class="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[4px] border-x-transparent border-b-[6px] border-b-cyan-400"></div>
                 </div>
@@ -264,6 +278,95 @@
         let isLocked = false;
         let selectedMinutes = START_MINUTES;
         let isProgrammaticScroll = false;
+
+        // ==========================================
+        //  線性馬達 (LRA) 擬真觸覺與噠噠聲音效引擎
+        // ==========================================
+        class LinearMotorHapticEngine {
+            constructor() {
+                this.audioCtx = null;
+                this.tickBuffer = null;
+                this.majorTickBuffer = null;
+                this.lastTickTime = 0;
+                this.minInterval = 18; // 限制最高頻率，防止極速滑動破音 (約每秒 55 次)
+            }
+
+            init() {
+                if (this.audioCtx) return;
+                const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtxClass) return;
+
+                this.audioCtx = new AudioCtxClass();
+                this.tickBuffer = this.createHapticImpulseBuffer(180, 2200, 0.009); // 一般分鐘微回饋
+                this.majorTickBuffer = this.createHapticImpulseBuffer(140, 1600, 0.015); // 5/30/60 分鐘深沉回饋
+            }
+
+            // 合成出手機線性震動馬達（LRA）的 160Hz 慣性質量共振 + 2kHz 機械卡榫聲
+            createHapticImpulseBuffer(lowFreq, highFreq, duration) {
+                const sampleRate = this.audioCtx.sampleRate;
+                const frameCount = Math.floor(sampleRate * duration);
+                const buffer = this.audioCtx.createBuffer(1, frameCount, sampleRate);
+                const data = buffer.getChannelData(0);
+
+                for (let i = 0; i < frameCount; i++) {
+                    const t = i / sampleRate;
+                    // 高頻敲擊瞬態 (Transient mechanical click)
+                    const highClick = Math.exp(-t / 0.0018) * Math.sin(2 * Math.PI * highFreq * t);
+                    // 低頻馬達動量彈震 (LRA inertial rumble ~160Hz)
+                    const lowThump = Math.exp(-t / 0.005) * Math.sin(2 * Math.PI * lowFreq * t);
+                    // 融合兩者產生扎實的 "噠" 感
+                    data[i] = (highClick * 0.45) + (lowThump * 0.55);
+                }
+                return buffer;
+            }
+
+            trigger(isMajor = false) {
+                const now = performance.now();
+                if (now - this.lastTickTime < this.minInterval) return;
+                this.lastTickTime = now;
+
+                // 1. 硬體真實線性震動 (Android / 支援的設備)
+                if (navigator.vibrate) {
+                    try {
+                        navigator.vibrate(isMajor ? 8 : 4);
+                    } catch (e) {}
+                }
+
+                // 2. 視聽覺聲學高擬真反饋 (突破 iOS Safari 無震動 API 的限制)
+                if (!this.audioCtx) this.init();
+                if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+
+                if (this.audioCtx && this.audioCtx.state === 'running') {
+                    const source = this.audioCtx.createBufferSource();
+                    source.buffer = isMajor ? this.majorTickBuffer : this.tickBuffer;
+                    
+                    const gain = this.audioCtx.createGain();
+                    // 音量設定適中，營造精密的實體齒輪聲
+                    gain.gain.value = isMajor ? 0.35 : 0.2;
+
+                    source.connect(gain);
+                    gain.connect(this.audioCtx.destination);
+                    source.start();
+                }
+
+                // 3. 中央紅外線指針微彈動視覺
+                const needle = document.getElementById('aim-needle');
+                if (needle) {
+                    needle.classList.remove('needle-active');
+                    void needle.offsetWidth; // 強制重繪
+                    needle.classList.add('needle-active');
+                }
+            }
+        }
+
+        const haptic = new LinearMotorHapticEngine();
+
+        // 監聽首次使用者互動以解鎖 Web Audio Context 播放限制
+        ['touchstart', 'mousedown', 'pointerdown', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, () => haptic.init(), { once: true, passive: true });
+        });
 
         // 取得當前營運時間對應的分鐘數 (05:40 ~ 25:10)
         function getCurrentServiceMinutes() {
@@ -406,6 +509,10 @@
                 const calcMin = Math.min(END_MINUTES, Math.max(START_MINUTES, Math.round(START_MINUTES + scrollLeft / PX_PER_MIN)));
 
                 if (calcMin !== selectedMinutes) {
+                    // 觸發線性馬達噠噠聲！大刻度(5分/整點)反饋更沉穩
+                    const isMajorTick = (calcMin % 5 === 0);
+                    haptic.trigger(isMajorTick);
+
                     selectedMinutes = calcMin;
                     updateTimeDisplay();
 
@@ -421,7 +528,7 @@
                         });
                     }
                 }
-            });
+            }, { passive: true });
 
             scroller.addEventListener('wheel', (e) => {
                 e.preventDefault();
@@ -436,6 +543,7 @@
                 isDown = true;
                 startX = e.pageX - scroller.offsetLeft;
                 startScroll = scroller.scrollLeft;
+                haptic.init();
             });
             window.addEventListener('mouseup', () => isDown = false);
             scroller.addEventListener('mousemove', (e) => {
@@ -449,6 +557,7 @@
         document.getElementById('lock-toggle').onclick = () => {
             isLocked = !isLocked;
             applyLockVisuals(isLocked);
+            haptic.trigger(true);
 
             if (isLocked) {
                 localStorage.setItem(LOCK_TIME_KEY, selectedMinutes.toString());
@@ -459,6 +568,7 @@
         };
 
         document.getElementById('btn-sync-now').onclick = () => {
+            haptic.trigger(true);
             if (isLocked) {
                 isLocked = false;
                 localStorage.removeItem(LOCK_TIME_KEY);
