@@ -2,9 +2,16 @@
 <html lang="zh-TW" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 1. 加入 viewport-fit=cover 貼齊全螢幕 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <!-- 2. 將 black-translucent 改為 black，使用獨立原生狀態列，避開 Liquid Glass 磨砂遮罩 -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="NTU轉乘系統">
+    <!-- 3. 加入 theme-color 保持背景色一致 -->
+    <meta name="theme-color" content="#030712">
+
     <link rel="apple-touch-icon" href="./icon.jpeg">
     <title>NTU轉乘系統 - 主控制台</title>
     
@@ -35,17 +42,34 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        /* 4. 鎖定 html 視口背景色與溢出，消除回彈邊界 */
+        html {
+            background-color: var(--dark-bg);
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        /* 5. 參照範例改用 fixed inset: 0 與 100dvh，徹底消滅黑邊與彈動觸發的霧狀遮罩 */
         body { 
             font-family: 'Noto Sans TC', sans-serif; 
             background-color: var(--dark-bg);
             color: #f1f5f9;
             margin: 0;
             padding: 0;
-            height: 100vh;
-            width: 100vw;
+            
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100dvh;
+            max-height: 100dvh;
+
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            -webkit-font-smoothing: antialiased;
             background-image: 
                 radial-gradient(circle at 50% 0%, rgba(0, 242, 255, 0.08) 0%, transparent 60%),
                 radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
@@ -105,7 +129,11 @@
             -webkit-backdrop-filter: blur(16px);
         }
 
-        /* 底部導覽頁籤樣式 */
+        /* 底部導覽頁籤樣式 - 加入 safe-area-inset-bottom 確保底部 Home Bar 不會遮擋 */
+        nav.glass-panel {
+            padding-bottom: max(0.375rem, env(safe-area-inset-bottom));
+        }
+
         .nav-tab {
             position: relative;
             display: flex;
@@ -247,7 +275,7 @@
             </div>
         </div>
 
-        <!-- 讀取失敗提示視窗 (精簡版：無範例匡，直觀提示) -->
+        <!-- 讀取失敗提示視窗 -->
         <div id="error-display" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-center p-6 text-center z-40">
             <div class="p-6 rounded-2xl border border-red-500/30 bg-slate-900/90 max-w-sm w-full space-y-4 shadow-2xl shadow-red-950/40 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent"></div>
@@ -269,26 +297,21 @@
         </div>
 
         <!-- 動態堆疊的常駐 iframe 容器 -->
-        <div id="iframe-stack" class="w-full h-full relative">
-            <!-- JavaScript 會在這裡動態插入多個 <iframe class="app-iframe"> -->
-        </div>
+        <div id="iframe-stack" class="w-full h-full relative"></div>
     </main>
 
     <!-- 底部頁面切換欄 (頁籤選單) -->
     <nav class="glass-panel flex-none border-t border-cyan-500/20 px-3 py-1.5 z-30 shadow-2xl">
-        <div id="nav-container" class="max-w-md mx-auto flex justify-around items-center gap-1">
-            <!-- 由 JavaScript 動態抓取 pages.json 後填入 -->
-        </div>
+        <div id="nav-container" class="max-w-md mx-auto flex justify-around items-center gap-1"></div>
     </nav>
 
     <script>
         let pagesData = [];
         let activePageIndex = -1;
-        const iframesMap = {}; // 快取 iframe 實體 DOM
-        const iframeLoadedMap = {}; // 紀錄各 iframe 是否已載入完畢
+        const iframesMap = {};
+        const iframeLoadedMap = {};
         let lastClickTime = 0;
 
-        // 時鐘更新函數 (包含秒數)
         function updateClock() {
             const now = new Date();
             const hh = now.getHours().toString().padStart(2, '0');
@@ -297,7 +320,6 @@
             document.getElementById('current-time-display').innerText = `${hh}:${mm}:${ss}`;
         }
 
-        // 隱藏/顯示 Loader 畫面
         function setLoaderState(show) {
             const loader = document.getElementById('frame-loader');
             if (show) {
@@ -307,18 +329,15 @@
             }
         }
 
-        // 重新整理當前頁面
         function reloadCurrentPage() {
             if (activePageIndex >= 0) {
                 switchPage(activePageIndex, true);
             }
         }
 
-        // 高效秒切頁面 (背景 iframes 常駐)
         function switchPage(index, forceReload = false) {
             if (!pagesData[index]) return;
 
-            // 雙擊當前 Tab 可強制重新整理該 iframe
             const now = Date.now();
             if (index === activePageIndex && !forceReload) {
                 if (now - lastClickTime < 300) {
@@ -338,14 +357,12 @@
 
             activePageIndex = index;
 
-            // 1. 若該 iframe 尚未載入完成，顯示載入動畫；若已載入，立即隱藏
             if (!iframeLoadedMap[index]) {
                 setLoaderState(true);
             } else {
                 setLoaderState(false);
             }
 
-            // 2. 切換各 iframe 可視性 (透過 active class 控制 opacity 與 transform)
             Object.keys(iframesMap).forEach(key => {
                 const k = Number(key);
                 if (k === index) {
@@ -355,7 +372,6 @@
                 }
             });
 
-            // 3. 更新底部導覽按鈕 Active 高亮狀態
             document.querySelectorAll('.nav-tab').forEach((tab, i) => {
                 if (i === index) {
                     tab.classList.add('active');
@@ -365,7 +381,6 @@
             });
         }
 
-        // 讀取 pages.json 並為所有頁面創建常駐 background iframe
         async function loadPagesJson() {
             const errorDisplay = document.getElementById('error-display');
             const navContainer = document.getElementById('nav-container');
@@ -376,28 +391,20 @@
             iframeStack.innerHTML = '';
 
             try {
-                // 自動發送請求讀取同層級 pages.json (避免快取)
                 const res = await fetch(`./pages.json?t=${Date.now()}`);
-                
-                if (!res.ok) {
-                    throw new Error(`HTTP Error Status: ${res.status}`);
-                }
+                if (!res.ok) throw new Error(`HTTP Error Status: ${res.status}`);
 
                 pagesData = await res.json();
-
                 if (!Array.isArray(pagesData) || pagesData.length === 0) {
                     throw new Error("pages.json 資料格式不正確或為空陣列");
                 }
 
-                // 為每一個頁面建立專屬的背景常駐 Iframe 與底部按鈕
                 pagesData.forEach((page, idx) => {
-                    // --- 建立常駐 Iframe ---
                     const frame = document.createElement('iframe');
                     frame.id = `app-frame-${idx}`;
                     frame.className = `app-iframe ${idx === 0 ? 'active' : ''}`;
                     frame.name = `app-frame-${idx}`;
                     
-                    // 監聽各 iframe 的載入完成事件
                     iframeLoadedMap[idx] = false;
                     frame.addEventListener('load', () => {
                         iframeLoadedMap[idx] = true;
@@ -406,12 +413,10 @@
                         }
                     });
 
-                    // 設定 iframe 路徑
                     frame.src = page.path;
                     iframeStack.appendChild(frame);
                     iframesMap[idx] = frame;
 
-                    // --- 建立底部導覽選單按鈕 ---
                     const button = document.createElement('button');
                     button.className = `nav-tab ${idx === 0 ? 'active' : ''}`;
                     
@@ -427,16 +432,13 @@
                     navContainer.appendChild(button);
                 });
 
-                // 預設切換至第一個頁面
                 switchPage(0);
-
             } catch (err) {
                 console.error("載入 pages.json 失敗:", err);
                 errorDisplay.classList.remove('hidden');
             }
         }
 
-        // 支援鍵盤數字鍵切換頁籤 (1 ~ 9)
         window.addEventListener('keydown', (e) => {
             const keyNum = parseInt(e.key);
             if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= pagesData.length) {
@@ -444,7 +446,6 @@
             }
         });
 
-        // 初始化系統
         window.addEventListener('DOMContentLoaded', () => {
             updateClock();
             setInterval(updateClock, 1000);
